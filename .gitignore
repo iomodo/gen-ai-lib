@@ -1,0 +1,12 @@
+# IDE/editor directories and files
+.idea/
+.vscode/
+*.swp
+*~
+.DS_Store
+
+# Logs
+*.log
+
+# db
+*.db
