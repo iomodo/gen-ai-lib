@@ -53,8 +53,8 @@ func (i *image) Edit(provider string, model string, input any, prompt string, op
 }
 
 func (i *image) getReplicateService() (replicate.ReplicateService, error) {
-	if !i.replicateService.IsInitialized() {
-		replicateService, err := replicate.NewReplicateService(os.Getenv("REPLICATE_API_TOKEN"))
+	if i.replicateService == nil || !i.replicateService.IsInitialized() {
+		replicateService, err := replicate.NewReplicateService(os.Getenv(ReplicateAPIToken))
 		if err != nil {
 			return nil, err
 		}
