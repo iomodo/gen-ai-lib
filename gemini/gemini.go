@@ -2,8 +2,6 @@ package gemini
 
 import (
 	"context"
-	"encoding/base64"
-	"encoding/json"
 	"fmt"
 	"io"
 	"log"
@@ -11,9 +9,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/google/generative-ai-go/genai"
-	aiplatform "google.golang.org/api/aiplatform/v1"
-	"google.golang.org/api/option"
+	"google.golang.org/genai"
 )
 
 const (
@@ -38,7 +34,9 @@ type geminiService struct {
 
 func NewGeminiService() GeminiService {
 	apiKey := os.Getenv("GEMINI_API_KEY")
-	client, err := genai.NewClient(context.Background(), option.WithAPIKey(apiKey))
+	client, err := genai.NewClient(context.Background(), &genai.ClientConfig{
+		APIKey: apiKey,
+	})
 	if err != nil {
 		log.Fatalf("failed to create genai client: %v", err)
 	}
@@ -48,29 +46,23 @@ func NewGeminiService() GeminiService {
 }
 
 func (s *geminiService) GenerateImagen3Image(ctx context.Context, prompt string) ([]byte, error) {
-	model := s.client.GenerativeModel(IMAGEN_3_MODEL)
-	resp, err := model.GenerateContent(ctx, genai.Text(prompt))
+	resp, err := s.client.Models.GenerateImages(ctx, IMAGEN_3_MODEL, prompt, nil)
 	if err != nil {
 		return nil, err
 	}
-	for _, part := range resp.Candidates[0].Content.Parts {
-		if img, ok := part.(*genai.Blob); ok {
-			return img.Data, nil
-		}
+	if len(resp.GeneratedImages) > 0 && resp.GeneratedImages[0].Image != nil {
+		return resp.GeneratedImages[0].Image.ImageBytes, nil
 	}
 	return nil, nil
 }
 
 func (s *geminiService) GenerateFlash2Image(ctx context.Context, prompt string) ([]byte, error) {
-	model := s.client.GenerativeModel(FLASH_2_MODEL)
-	resp, err := model.GenerateContent(ctx, genai.Text(prompt))
+	resp, err := s.client.Models.GenerateImages(ctx, FLASH_2_MODEL, prompt, nil)
 	if err != nil {
 		return nil, err
 	}
-	for _, part := range resp.Candidates[0].Content.Parts {
-		if img, ok := part.(*genai.Blob); ok {
-			return img.Data, nil
-		}
+	if len(resp.GeneratedImages) > 0 && resp.GeneratedImages[0].Image != nil {
+		return resp.GeneratedImages[0].Image.ImageBytes, nil
 	}
 	return nil, nil
 }
@@ -83,82 +75,51 @@ func (s *geminiService) GenerateFlashWithImage(ctx context.Context, prompt, imag
 }
 
 func (s *geminiService) GenerateVeo3Video(ctx context.Context, prompt string) ([]byte, error) {
-	model := s.client.GenerativeModel(VEO_3_MODEL)
-	resp, err := model.GenerateContent(ctx, genai.Text(prompt))
+	op, err := s.client.Models.GenerateVideos(ctx, VEO_3_MODEL, prompt, nil, nil)
 	if err != nil {
 		return nil, err
 	}
-	for _, part := range resp.Candidates[0].Content.Parts {
-		if video, ok := part.(*genai.Blob); ok {
-			return video.Data, nil
+	for !op.Done {
+		time.Sleep(2 * time.Second)
+		op, err = s.client.Operations.GetVideosOperation(ctx, op, nil)
+		if err != nil {
+			return nil, err
 		}
 	}
-	return nil, nil
+	if len(op.Response.GeneratedVideos) > 0 {
+		data, err := s.client.Files.Download(ctx, genai.NewDownloadURIFromGeneratedVideo(op.Response.GeneratedVideos[0]), nil)
+		if err != nil {
+			return nil, err
+		}
+		return data, nil
+	}
+	return nil, fmt.Errorf("video generation did not return a result")
 }
 
 // GenerateVeo3PreviewVideo creates a video using the veo-3.0-generate-preview model
 // by providing the first and last frames along with the prompt.
 func (s *geminiService) GenerateVeo3PreviewVideo(ctx context.Context, prompt string, firstFrame, lastFrame []byte) ([]byte, error) {
-	projectID := os.Getenv("GEMINI_PROJECT_ID")
-	svc, err := aiplatform.NewService(ctx, option.WithAPIKey(os.Getenv("GEMINI_API_KEY")))
+	start := &genai.Image{ImageBytes: firstFrame, MIMEType: "image/png"}
+	cfg := &genai.GenerateVideosConfig{
+		LastFrame: &genai.Image{ImageBytes: lastFrame, MIMEType: "image/png"},
+	}
+	op, err := s.client.Models.GenerateVideos(ctx, VEO_3_PREVIEW_MODEL, prompt, start, cfg)
 	if err != nil {
 		return nil, err
 	}
-
-	endpoint := fmt.Sprintf("projects/%s/locations/us-central1/publishers/google/models/%s", projectID, VEO_3_PREVIEW_MODEL)
-
-	req := &aiplatform.GoogleCloudAiplatformV1PredictLongRunningRequest{
-		Instances: []interface{}{
-			map[string]any{
-				"prompt": prompt,
-				"first_frame": map[string]any{
-					"mimeType":           "image/png",
-					"bytesBase64Encoded": base64.StdEncoding.EncodeToString(firstFrame),
-				},
-				"last_frame": map[string]any{
-					"mimeType":           "image/png",
-					"bytesBase64Encoded": base64.StdEncoding.EncodeToString(lastFrame),
-				},
-			},
-		},
-		Parameters: map[string]any{
-			"mime_type": "video/mp4",
-		},
-	}
-
-	op, err := svc.Projects.Locations.Publishers.Models.PredictLongRunning(endpoint, req).Do()
-	if err != nil {
-		return nil, err
-	}
-
-	fetchReq := &aiplatform.GoogleCloudAiplatformV1FetchPredictOperationRequest{OperationName: op.Name}
-	// Poll until the operation is done or context canceled
-	for {
-		opResp, err := svc.Projects.Locations.Publishers.Models.FetchPredictOperation(endpoint, fetchReq).Do()
+	for !op.Done {
+		time.Sleep(2 * time.Second)
+		op, err = s.client.Operations.GetVideosOperation(ctx, op, nil)
 		if err != nil {
 			return nil, err
 		}
-		if opResp.Done {
-			var data struct {
-				Response struct {
-					Videos []struct {
-						Bytes string `json:"bytesBase64Encoded"`
-					} `json:"videos"`
-				} `json:"response"`
-			}
-			if err := json.Unmarshal(opResp.Response, &data); err != nil {
-				return nil, err
-			}
-			if len(data.Response.Videos) > 0 {
-				return base64.StdEncoding.DecodeString(data.Response.Videos[0].Bytes)
-			}
-			break
+	}
+	if len(op.Response.GeneratedVideos) > 0 {
+		data, err := s.client.Files.Download(ctx, genai.NewDownloadURIFromGeneratedVideo(op.Response.GeneratedVideos[0]), nil)
+		if err != nil {
+			return nil, err
 		}
-		select {
-		case <-ctx.Done():
-			return nil, ctx.Err()
-		case <-time.After(2 * time.Second):
-		}
+		return data, nil
 	}
 	return nil, fmt.Errorf("video generation did not return a result")
 }
