@@ -5,7 +5,9 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
+	"net/http"
 	"os"
 	"time"
 
@@ -27,6 +29,7 @@ type GeminiService interface {
 	GenerateFlashWithImage(ctx context.Context, prompt, imageURL string) ([]byte, error)
 	GenerateVeo3Video(ctx context.Context, prompt string) ([]byte, error)
 	GenerateVeo3PreviewVideo(ctx context.Context, prompt string, firstFrame, lastFrame []byte) ([]byte, error)
+	GenerateVeo3PreviewVideoFromURLs(ctx context.Context, prompt, firstFrameURL, lastFrameURL string) ([]byte, error)
 }
 
 type geminiService struct {
@@ -158,4 +161,30 @@ func (s *geminiService) GenerateVeo3PreviewVideo(ctx context.Context, prompt str
 		}
 	}
 	return nil, fmt.Errorf("video generation did not return a result")
+}
+
+// GenerateVeo3PreviewVideoFromURLs downloads the first and last frame images
+// from the provided URLs and invokes GenerateVeo3PreviewVideo.
+func (s *geminiService) GenerateVeo3PreviewVideoFromURLs(ctx context.Context, prompt, firstFrameURL, lastFrameURL string) ([]byte, error) {
+	firstResp, err := http.Get(firstFrameURL)
+	if err != nil {
+		return nil, fmt.Errorf("failed to download first frame: %w", err)
+	}
+	defer firstResp.Body.Close()
+	firstData, err := io.ReadAll(firstResp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read first frame: %w", err)
+	}
+
+	lastResp, err := http.Get(lastFrameURL)
+	if err != nil {
+		return nil, fmt.Errorf("failed to download last frame: %w", err)
+	}
+	defer lastResp.Body.Close()
+	lastData, err := io.ReadAll(lastResp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read last frame: %w", err)
+	}
+
+	return s.GenerateVeo3PreviewVideo(ctx, prompt, firstData, lastData)
 }
