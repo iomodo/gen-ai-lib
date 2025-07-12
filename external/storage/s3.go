@@ -1,4 +1,4 @@
-package genailib
+package storage
 
 import (
 	"bytes"
@@ -9,17 +9,34 @@ import (
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
+	"github.com/google/uuid"
 	"github.com/pkg/errors"
 )
 
-// UploadImageToS3 uploads image bytes to an Amazon S3 bucket and returns the public URL.
-func UploadImageToS3(ctx context.Context, bucketName, objectName string, data []byte) (string, error) {
-	return uploadToS3(ctx, bucketName, objectName, data)
+type s3Service struct {
+	client     *s3.Client
+	bucketName string
 }
 
-// UploadVideoToS3 uploads video bytes to an Amazon S3 bucket and returns the public URL.
-func UploadVideoToS3(ctx context.Context, bucketName, objectName string, data []byte) (string, error) {
-	return uploadToS3(ctx, bucketName, objectName, data)
+func NewS3Service(bucketName string) (Storage, error) {
+	cfg, err := config.LoadDefaultConfig(context.Background())
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to load AWS config")
+	}
+	return &s3Service{
+		client:     s3.NewFromConfig(cfg),
+		bucketName: bucketName,
+	}, nil
+}
+
+func (s *s3Service) Upload(ctx context.Context, data []byte, objectName string) (string, error) {
+	var objName string
+	if objectName != "" {
+		objName = objectName
+	} else {
+		objName = fmt.Sprintf("object-%s", uuid.New().String())
+	}
+	return uploadToS3(ctx, s.bucketName, objName, data)
 }
 
 func uploadToS3(ctx context.Context, bucketName, objectName string, data []byte) (string, error) {
