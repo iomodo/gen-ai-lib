@@ -18,6 +18,10 @@ gen-ai-lib is designed to provide a unified interface for interacting with multi
 
 Coming soon: Installation and usage instructions.
 
+### Video helpers
+
+The `AppendVideos` function merges two MP4 clips using the `ffmpeg` command-line tool. You must have `ffmpeg` installed and accessible on your system `PATH`.
+
 ## License
 
 MIT
