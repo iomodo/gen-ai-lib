@@ -10,6 +10,7 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/pkg/errors v0.9.1
 	github.com/replicate/replicate-go v0.26.0
+	github.com/sashabaranov/go-openai v1.40.5
 	google.golang.org/genai v1.15.0
 )
 
