@@ -11,6 +11,7 @@ gen-ai-lib is designed to provide a unified interface for interacting with multi
 - Easy integration and extensibility
 - Aggregation and fallback strategies
 - GCP Cloud Storage helpers for uploading images and videos and returning public URLs
+- Amazon S3 helpers for uploading images and videos with public access
 - Designed for production use
 
 ## Getting Started
