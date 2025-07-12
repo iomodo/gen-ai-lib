@@ -10,6 +10,7 @@ gen-ai-lib is designed to provide a unified interface for interacting with multi
 - Unified interface for multiple generative AI providers (OpenAI, Cohere, etc.)
 - Easy integration and extensibility
 - Aggregation and fallback strategies
+- GCP Cloud Storage helpers for uploading images and videos and returning public URLs
 - Designed for production use
 
 ## Getting Started
