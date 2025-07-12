@@ -1,4 +1,4 @@
-package genailib
+package storage
 
 import (
 	"bytes"
@@ -7,17 +7,34 @@ import (
 	"io"
 
 	"cloud.google.com/go/storage"
+	"github.com/google/uuid"
 	"github.com/pkg/errors"
 )
 
-// UploadImageToGCP uploads image bytes to a GCP Cloud Storage bucket.
-func UploadImageToGCP(ctx context.Context, bucketName, objectName string, data []byte) (string, error) {
-	return uploadToGCP(ctx, bucketName, objectName, data)
+type gcpService struct {
+	client     *storage.Client
+	bucketName string
 }
 
-// UploadVideoToGCP uploads video bytes to a GCP Cloud Storage bucket.
-func UploadVideoToGCP(ctx context.Context, bucketName, objectName string, data []byte) (string, error) {
-	return uploadToGCP(ctx, bucketName, objectName, data)
+func NewGCPService(bucketName string) (Storage, error) {
+	client, err := storage.NewClient(context.Background())
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to create storage client")
+	}
+	return &gcpService{
+		client:     client,
+		bucketName: bucketName,
+	}, nil
+}
+
+func (g *gcpService) Upload(ctx context.Context, data []byte, objectName string) (string, error) {
+	var objName string
+	if objectName != "" {
+		objName = objectName
+	} else {
+		objName = fmt.Sprintf("object-%s", uuid.New().String())
+	}
+	return uploadToGCP(ctx, g.bucketName, objName, data)
 }
 
 func uploadToGCP(ctx context.Context, bucketName, objectName string, data []byte) (string, error) {
