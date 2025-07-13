@@ -30,9 +30,7 @@ func AppendVideos(video1, video2 []byte) ([]byte, error) {
 		return nil, errors.Wrap(err, "failed to write second video")
 	}
 
-	cmd := exec.Command("ffmpeg", "-i", input1, "-i", input2, "-filter_complex",
-		"[0:v][0:a][1:v][1:a]concat=n=2:v=1:a=1[v][a]", "-map", "[v]", "-map", "[a]",
-		"-y", output)
+	cmd := exec.Command("ffmpeg", "-i", input1, "-i", input2, "-filter_complex", "[0:v][1:v]concat=n=2:v=1[out]", "-map", "[out]", "-y", output)
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
 
