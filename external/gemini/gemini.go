@@ -27,6 +27,8 @@ type GeminiService interface {
 	GenerateVeo3Video(ctx context.Context, prompt string) ([]byte, error)
 	GenerateVeo3PreviewVideo(ctx context.Context, prompt string, firstFrame, lastFrame []byte) ([]byte, error)
 	GenerateVeo3PreviewVideoFromURLs(ctx context.Context, prompt, firstFrameURL, lastFrameURL string) ([]byte, error)
+	GenerateVeo3PreviewVideoWithStartFrame(ctx context.Context, prompt string, firstFrame []byte) ([]byte, error)
+	GenerateVeo3PreviewVideoWithStartFrameURL(ctx context.Context, prompt, firstFrameURL string) ([]byte, error)
 }
 
 type geminiService struct {
@@ -166,4 +168,45 @@ func (s *geminiService) GenerateVeo3PreviewVideoFromURLs(ctx context.Context, pr
 	}
 
 	return s.GenerateVeo3PreviewVideo(ctx, prompt, firstData, lastData)
+}
+
+// GenerateVeo3PreviewVideoWithStartFrame creates a preview video using the
+// veo-3.0-generate-preview model by providing only the first frame and the
+// prompt. The model will infer the rest of the clip.
+func (s *geminiService) GenerateVeo3PreviewVideoWithStartFrame(ctx context.Context, prompt string, firstFrame []byte) ([]byte, error) {
+	start := &genai.Image{ImageBytes: firstFrame, MIMEType: "image/png"}
+	op, err := s.client.Models.GenerateVideos(ctx, VEO_3_PREVIEW_MODEL, prompt, start, nil)
+	if err != nil {
+		return nil, err
+	}
+	for !op.Done {
+		time.Sleep(2 * time.Second)
+		op, err = s.client.Operations.GetVideosOperation(ctx, op, nil)
+		if err != nil {
+			return nil, err
+		}
+	}
+	if len(op.Response.GeneratedVideos) > 0 {
+		data, err := s.client.Files.Download(ctx, genai.NewDownloadURIFromGeneratedVideo(op.Response.GeneratedVideos[0]), nil)
+		if err != nil {
+			return nil, err
+		}
+		return data, nil
+	}
+	return nil, fmt.Errorf("video generation did not return a result")
+}
+
+// GenerateVeo3PreviewVideoWithStartFrameURL downloads the first frame image from
+// the provided URL and invokes GenerateVeo3PreviewVideoWithStartFrame.
+func (s *geminiService) GenerateVeo3PreviewVideoWithStartFrameURL(ctx context.Context, prompt, firstFrameURL string) ([]byte, error) {
+	resp, err := http.Get(firstFrameURL)
+	if err != nil {
+		return nil, fmt.Errorf("failed to download first frame: %w", err)
+	}
+	defer resp.Body.Close()
+	data, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read first frame: %w", err)
+	}
+	return s.GenerateVeo3PreviewVideoWithStartFrame(ctx, prompt, data)
 }
