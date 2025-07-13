@@ -7,6 +7,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
 	"google.golang.org/genai"
@@ -34,9 +35,26 @@ type geminiService struct {
 
 func NewGeminiService() GeminiService {
 	apiKey := os.Getenv("GEMINI_API_KEY")
-	client, err := genai.NewClient(context.Background(), &genai.ClientConfig{
-		APIKey: apiKey,
-	})
+
+	useVertex := false
+	if v := strings.ToLower(os.Getenv("GOOGLE_GENAI_USE_VERTEXAI")); v == "1" || v == "true" {
+		useVertex = true
+	}
+
+	cfg := &genai.ClientConfig{APIKey: apiKey}
+	if useVertex {
+		cfg.Backend = genai.BackendVertexAI
+		if project := os.Getenv("GOOGLE_CLOUD_PROJECT"); project != "" {
+			cfg.Project = project
+		}
+		if loc := os.Getenv("GOOGLE_CLOUD_LOCATION"); loc != "" {
+			cfg.Location = loc
+		} else if loc := os.Getenv("GOOGLE_CLOUD_REGION"); loc != "" {
+			cfg.Location = loc
+		}
+	}
+
+	client, err := genai.NewClient(context.Background(), cfg)
 	if err != nil {
 		log.Fatalf("failed to create genai client: %v", err)
 	}

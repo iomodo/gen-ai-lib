@@ -29,6 +29,13 @@ func TestWorkflowGenerateVideo(t *testing.T) {
 	if os.Getenv("GEMINI_API_KEY") == "" {
 		t.Skip("GEMINI_API_KEY not set")
 	}
+	os.Setenv("GOOGLE_GENAI_USE_VERTEXAI", "true")
+	if os.Getenv("GOOGLE_CLOUD_PROJECT") == "" {
+		os.Setenv("GOOGLE_CLOUD_PROJECT", "test-project")
+	}
+	if os.Getenv("GOOGLE_CLOUD_LOCATION") == "" && os.Getenv("GOOGLE_CLOUD_REGION") == "" {
+		os.Setenv("GOOGLE_CLOUD_LOCATION", "us-central1")
+	}
 	svc := NewWorkflowService()
 	wf := &Workflow{
 		Steps: []WorkflowStep{
@@ -112,6 +119,13 @@ func TestWorkflowMergeVideos(t *testing.T) {
 func TestWorkflowGenerateAndMergeVideos(t *testing.T) {
 	if os.Getenv("GEMINI_API_KEY") == "" {
 		t.Skip("GEMINI_API_KEY not set")
+	}
+	os.Setenv("GOOGLE_GENAI_USE_VERTEXAI", "true")
+	if os.Getenv("GOOGLE_CLOUD_PROJECT") == "" {
+		os.Setenv("GOOGLE_CLOUD_PROJECT", "test-project")
+	}
+	if os.Getenv("GOOGLE_CLOUD_LOCATION") == "" && os.Getenv("GOOGLE_CLOUD_REGION") == "" {
+		os.Setenv("GOOGLE_CLOUD_LOCATION", "us-central1")
 	}
 	if _, err := exec.LookPath("ffmpeg"); err != nil {
 		t.Skip("ffmpeg not installed")
