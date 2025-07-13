@@ -6,14 +6,16 @@ import (
 	"strings"
 	"time"
 
+	"github.com/iomodo/gen-ai-lib/external/gemini"
 	"github.com/pkg/errors"
 )
 
 // WorkflowStepFunctionType constants.
 const (
-	FunctionTypeTextsToText         = "texts_to_text"
-	FunctionTypeTextToImage         = "text_to_image"
-	FunctionTypeTextAndImageToImage = "text_and_image_to_image"
+	FunctionTypeTextsToText          = "texts_to_text"
+	FunctionTypeTextToImage          = "text_to_image"
+	FunctionTypeTextAndImageToImage  = "text_and_image_to_image"
+	FunctionTypeTextAndImagesToVideo = "text_and_images_to_video"
 )
 
 // Workflow providers.
@@ -31,6 +33,7 @@ const (
 	ProviderStabilitySD3                    = "stability-sd3"
 	ProviderFluxSchnell                     = "flux-schnell"
 	ProviderSana                            = "sana"
+	ProviderVeo3Preview                     = gemini.VEO_3_PREVIEW_MODEL
 )
 
 // WorkflowStep represents a single step in a workflow.
@@ -40,6 +43,8 @@ type WorkflowStep struct {
 	Provider     string `json:"provider,omitempty" yaml:"provider,omitempty"`
 	Prompt       string `json:"prompt,omitempty" yaml:"prompt,omitempty"`
 	Image        string `json:"image,omitempty" yaml:"image,omitempty"`
+	FirstImage   string `json:"first_image,omitempty" yaml:"first_image,omitempty"`
+	LastImage    string `json:"last_image,omitempty" yaml:"last_image,omitempty"`
 }
 
 // Workflow defines an ordered set of steps for content generation.
@@ -81,6 +86,8 @@ func (s *workflowService) Generate(ctx context.Context, wf *Workflow, inputs map
 			res, err = s.processTextToImage(ctx, step, inputs, results)
 		case FunctionTypeTextAndImageToImage:
 			res, err = s.processTextAndImageToImage(ctx, step, inputs, results)
+		case FunctionTypeTextAndImagesToVideo:
+			res, err = s.processTextAndImagesToVideo(ctx, step, inputs, results)
 		default:
 			err = errors.Errorf("unsupported function type: %s", step.FunctionType)
 		}
@@ -118,6 +125,32 @@ func (s *workflowService) processTextToImage(ctx context.Context, step WorkflowS
 func (s *workflowService) processTextAndImageToImage(ctx context.Context, step WorkflowStep, inputs map[string]any, results map[string]any) (any, error) {
 	// TODO: implement real logic. For now return dummy value.
 	return "text_and_image_to_image result", nil
+}
+
+func (s *workflowService) processTextAndImagesToVideo(ctx context.Context, step WorkflowStep, inputs map[string]any, results map[string]any) (any, error) {
+	if step.Prompt == "" {
+		return nil, errors.New("missing prompt template in step configuration")
+	}
+	if step.FirstImage == "" || step.LastImage == "" {
+		return nil, errors.New("missing first or last image in step configuration")
+	}
+
+	prompt := s.interpolateVariables(step.Prompt, inputs, results)
+	firstURL := s.interpolateVariables(step.FirstImage, inputs, results)
+	lastURL := s.interpolateVariables(step.LastImage, inputs, results)
+
+	provider := step.Provider
+	if provider == "" {
+		provider = ProviderVeo3Preview
+	}
+
+	switch provider {
+	case ProviderVeo3Preview:
+		svc := gemini.NewGeminiService()
+		return svc.GenerateVeo3PreviewVideoFromURLs(ctx, prompt, firstURL, lastURL)
+	default:
+		return nil, fmt.Errorf("unsupported provider: %s", provider)
+	}
 }
 
 // interpolateVariables replaces placeholders in the template string with values from inputs and results.
