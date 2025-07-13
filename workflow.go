@@ -3,10 +3,12 @@ package genailib
 import (
 	"context"
 	"fmt"
+	"os"
 	"strings"
 	"time"
 
 	"github.com/iomodo/gen-ai-lib/external/gemini"
+	"github.com/iomodo/gen-ai-lib/external/replicate"
 	"github.com/pkg/errors"
 )
 
@@ -35,6 +37,7 @@ const (
 	ProviderStabilitySD3                    = "stability-sd3"
 	ProviderFluxSchnell                     = "flux-schnell"
 	ProviderSana                            = "sana"
+	ProviderSeedance1                       = replicate.Seedance1Model
 	ProviderVeo3Preview                     = gemini.VEO_3_PREVIEW_MODEL
 )
 
@@ -155,6 +158,13 @@ func (s *workflowService) processTextAndImagesToVideo(ctx context.Context, step 
 	case ProviderVeo3Preview:
 		svc := gemini.NewGeminiService()
 		return svc.GenerateVeo3PreviewVideoFromURLs(ctx, prompt, firstURL, lastURL)
+	case ProviderSeedance1:
+		svc, err := replicate.NewReplicateService(os.Getenv(ReplicateAPIToken))
+		if err != nil {
+			return nil, err
+		}
+		opts := map[string]any{"image": firstURL, "last_frame_image": lastURL}
+		return svc.RunSeedance1(ctx, prompt, opts)
 	default:
 		return nil, fmt.Errorf("unsupported provider: %s", provider)
 	}
@@ -180,6 +190,13 @@ func (s *workflowService) processTextAndImageToVideo(ctx context.Context, step W
 	case ProviderVeo3Preview:
 		svc := gemini.NewGeminiService()
 		return svc.GenerateVeo3PreviewVideoWithStartFrameURL(ctx, prompt, firstURL)
+	case ProviderSeedance1:
+		svc, err := replicate.NewReplicateService(os.Getenv(ReplicateAPIToken))
+		if err != nil {
+			return nil, err
+		}
+		opts := map[string]any{"image": firstURL}
+		return svc.RunSeedance1(ctx, prompt, opts)
 	default:
 		return nil, fmt.Errorf("unsupported provider: %s", provider)
 	}
