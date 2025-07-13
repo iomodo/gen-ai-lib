@@ -42,3 +42,30 @@ func TestAppendVideos(t *testing.T) {
 		t.Fatalf("merged video is empty")
 	}
 }
+
+func TestMergeVideos(t *testing.T) {
+	if _, err := exec.LookPath("ffmpeg"); err != nil {
+		t.Skip("ffmpeg not installed")
+	}
+
+	v1, err := createColorVideo("red")
+	if err != nil {
+		t.Fatalf("failed to create first video: %v", err)
+	}
+	v2, err := createColorVideo("green")
+	if err != nil {
+		t.Fatalf("failed to create second video: %v", err)
+	}
+	v3, err := createColorVideo("blue")
+	if err != nil {
+		t.Fatalf("failed to create third video: %v", err)
+	}
+
+	merged, err := MergeVideos([][]byte{v1, v2, v3})
+	if err != nil {
+		t.Fatalf("MergeVideos returned error: %v", err)
+	}
+	if len(merged) == 0 {
+		t.Fatalf("merged video is empty")
+	}
+}
