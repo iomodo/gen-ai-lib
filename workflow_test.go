@@ -108,3 +108,49 @@ func TestWorkflowMergeVideos(t *testing.T) {
 		t.Fatalf("merged video is empty")
 	}
 }
+
+func TestWorkflowGenerateAndMergeVideos(t *testing.T) {
+	if os.Getenv("GEMINI_API_KEY") == "" {
+		t.Skip("GEMINI_API_KEY not set")
+	}
+	if _, err := exec.LookPath("ffmpeg"); err != nil {
+		t.Skip("ffmpeg not installed")
+	}
+
+	svc := NewWorkflowService()
+	wf := &Workflow{
+		Steps: []WorkflowStep{
+			{
+				ID:           "video1",
+				FunctionType: FunctionTypeTextAndImagesToVideo,
+				Prompt:       "A quick clip one",
+				FirstImage:   "https://picsum.photos/seed/frame1/256",
+				LastImage:    "https://picsum.photos/seed/frame2/256",
+			},
+			{
+				ID:           "video2",
+				FunctionType: FunctionTypeTextAndImagesToVideo,
+				Prompt:       "Another short clip",
+				FirstImage:   "https://picsum.photos/seed/frame3/256",
+				LastImage:    "https://picsum.photos/seed/frame4/256",
+			},
+			{
+				ID:           "merge",
+				FunctionType: FunctionTypeVideosToVideo,
+				Videos:       []string{"video1", "video2"},
+			},
+		},
+	}
+
+	result, _, err := svc.Generate(context.Background(), wf, nil)
+	if err != nil {
+		t.Fatalf("Generate returned error: %v", err)
+	}
+	merged, ok := result.([]byte)
+	if !ok {
+		t.Fatalf("expected []byte result, got %T", result)
+	}
+	if len(merged) == 0 {
+		t.Fatalf("merged video is empty")
+	}
+}
