@@ -168,3 +168,54 @@ func TestWorkflowGenerateAndMergeVideos(t *testing.T) {
 		t.Fatalf("merged video is empty")
 	}
 }
+
+func TestWorkflowSingleImageClipsAndMerge(t *testing.T) {
+	if os.Getenv("GEMINI_API_KEY") == "" {
+		t.Skip("GEMINI_API_KEY not set")
+	}
+	os.Setenv("GOOGLE_GENAI_USE_VERTEXAI", "true")
+	if os.Getenv("GOOGLE_CLOUD_PROJECT") == "" {
+		os.Setenv("GOOGLE_CLOUD_PROJECT", "test-project")
+	}
+	if os.Getenv("GOOGLE_CLOUD_LOCATION") == "" && os.Getenv("GOOGLE_CLOUD_REGION") == "" {
+		os.Setenv("GOOGLE_CLOUD_LOCATION", "us-central1")
+	}
+	if _, err := exec.LookPath("ffmpeg"); err != nil {
+		t.Skip("ffmpeg not installed")
+	}
+
+	svc := NewWorkflowService()
+	wf := &Workflow{
+		Steps: []WorkflowStep{
+			{
+				ID:           "clip1",
+				FunctionType: FunctionTypeTextAndImageToVideo,
+				Prompt:       "Clip using one image",
+				FirstImage:   "https://picsum.photos/seed/start1/256",
+			},
+			{
+				ID:           "clip2",
+				FunctionType: FunctionTypeTextAndImageToVideo,
+				Prompt:       "Another single image clip",
+				FirstImage:   "https://picsum.photos/seed/start2/256",
+			},
+			{
+				ID:           "merge",
+				FunctionType: FunctionTypeVideosToVideo,
+				Videos:       []string{"clip1", "clip2"},
+			},
+		},
+	}
+
+	result, _, err := svc.Generate(context.Background(), wf, nil)
+	if err != nil {
+		t.Fatalf("Generate returned error: %v", err)
+	}
+	merged, ok := result.([]byte)
+	if !ok {
+		t.Fatalf("expected []byte result, got %T", result)
+	}
+	if len(merged) == 0 {
+		t.Fatalf("merged video is empty")
+	}
+}
