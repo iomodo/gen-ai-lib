@@ -16,6 +16,7 @@ const (
 	FunctionTypeTextToImage          = "text_to_image"
 	FunctionTypeTextAndImageToImage  = "text_and_image_to_image"
 	FunctionTypeTextAndImagesToVideo = "text_and_images_to_video"
+	FunctionTypeTextAndImageToVideo  = "text_and_image_to_video"
 	FunctionTypeVideosToVideo        = "videos_to_video"
 )
 
@@ -90,6 +91,8 @@ func (s *workflowService) Generate(ctx context.Context, wf *Workflow, inputs map
 			res, err = s.processTextAndImageToImage(ctx, step, inputs, results)
 		case FunctionTypeTextAndImagesToVideo:
 			res, err = s.processTextAndImagesToVideo(ctx, step, inputs, results)
+		case FunctionTypeTextAndImageToVideo:
+			res, err = s.processTextAndImageToVideo(ctx, step, inputs, results)
 		case FunctionTypeVideosToVideo:
 			res, err = s.processVideosToVideo(ctx, step, inputs, results)
 		default:
@@ -152,6 +155,31 @@ func (s *workflowService) processTextAndImagesToVideo(ctx context.Context, step 
 	case ProviderVeo3Preview:
 		svc := gemini.NewGeminiService()
 		return svc.GenerateVeo3PreviewVideoFromURLs(ctx, prompt, firstURL, lastURL)
+	default:
+		return nil, fmt.Errorf("unsupported provider: %s", provider)
+	}
+}
+
+func (s *workflowService) processTextAndImageToVideo(ctx context.Context, step WorkflowStep, inputs map[string]any, results map[string]any) (any, error) {
+	if step.Prompt == "" {
+		return nil, errors.New("missing prompt template in step configuration")
+	}
+	if step.FirstImage == "" {
+		return nil, errors.New("missing first image in step configuration")
+	}
+
+	prompt := s.interpolateVariables(step.Prompt, inputs, results)
+	firstURL := s.interpolateVariables(step.FirstImage, inputs, results)
+
+	provider := step.Provider
+	if provider == "" {
+		provider = ProviderVeo3Preview
+	}
+
+	switch provider {
+	case ProviderVeo3Preview:
+		svc := gemini.NewGeminiService()
+		return svc.GenerateVeo3PreviewVideoWithStartFrameURL(ctx, prompt, firstURL)
 	default:
 		return nil, fmt.Errorf("unsupported provider: %s", provider)
 	}
