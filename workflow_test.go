@@ -219,3 +219,49 @@ func TestWorkflowSingleImageClipsAndMerge(t *testing.T) {
 		t.Fatalf("merged video is empty")
 	}
 }
+
+func TestWorkflowSeedanceSingleImageClipsAndMerge(t *testing.T) {
+	if os.Getenv(ReplicateAPIToken) == "" {
+		t.Skip("REPLICATE_API_TOKEN not set")
+	}
+	if _, err := exec.LookPath("ffmpeg"); err != nil {
+		t.Skip("ffmpeg not installed")
+	}
+
+	svc := NewWorkflowService()
+	wf := &Workflow{
+		Steps: []WorkflowStep{
+			{
+				ID:           "clip1",
+				FunctionType: FunctionTypeTextAndImageToVideo,
+				Provider:     ProviderSeedance1,
+				Prompt:       "A seedance clip from one image",
+				FirstImage:   "https://picsum.photos/seed/sclip1/256",
+			},
+			{
+				ID:           "clip2",
+				FunctionType: FunctionTypeTextAndImageToVideo,
+				Provider:     ProviderSeedance1,
+				Prompt:       "Another seedance clip",
+				FirstImage:   "https://picsum.photos/seed/sclip2/256",
+			},
+			{
+				ID:           "merge",
+				FunctionType: FunctionTypeVideosToVideo,
+				Videos:       []string{"clip1", "clip2"},
+			},
+		},
+	}
+
+	result, _, err := svc.Generate(context.Background(), wf, nil)
+	if err != nil {
+		t.Fatalf("Generate returned error: %v", err)
+	}
+	merged, ok := result.([]byte)
+	if !ok {
+		t.Fatalf("expected []byte result, got %T", result)
+	}
+	if len(merged) == 0 {
+		t.Fatalf("merged video is empty")
+	}
+}
