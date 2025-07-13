@@ -2,6 +2,8 @@ package genailib
 
 import (
 	"context"
+	"fmt"
+	"strings"
 	"time"
 
 	"github.com/pkg/errors"
@@ -100,8 +102,12 @@ func (s *workflowService) Generate(ctx context.Context, wf *Workflow, inputs map
 }
 
 func (s *workflowService) processTextsToText(ctx context.Context, step WorkflowStep, inputs map[string]any, results map[string]any) (any, error) {
-	// TODO: implement real logic. For now return dummy value.
-	return "texts_to_text result", nil
+	if step.Prompt == "" {
+		return nil, errors.New("missing prompt template in step configuration")
+	}
+
+	out := s.interpolateVariables(step.Prompt, inputs, results)
+	return out, nil
 }
 
 func (s *workflowService) processTextToImage(ctx context.Context, step WorkflowStep, inputs map[string]any, results map[string]any) (any, error) {
@@ -112,4 +118,18 @@ func (s *workflowService) processTextToImage(ctx context.Context, step WorkflowS
 func (s *workflowService) processTextAndImageToImage(ctx context.Context, step WorkflowStep, inputs map[string]any, results map[string]any) (any, error) {
 	// TODO: implement real logic. For now return dummy value.
 	return "text_and_image_to_image result", nil
+}
+
+// interpolateVariables replaces placeholders in the template string with values from inputs and results.
+func (s *workflowService) interpolateVariables(template string, inputs map[string]any, results map[string]any) string {
+	result := template
+	for k, v := range inputs {
+		placeholder := fmt.Sprintf("${%s}", k)
+		result = strings.ReplaceAll(result, placeholder, fmt.Sprint(v))
+	}
+	for k, v := range results {
+		placeholder := fmt.Sprintf("${%s}", k)
+		result = strings.ReplaceAll(result, placeholder, fmt.Sprint(v))
+	}
+	return result
 }
