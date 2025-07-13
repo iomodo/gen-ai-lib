@@ -16,6 +16,7 @@ const (
 	FunctionTypeTextToImage          = "text_to_image"
 	FunctionTypeTextAndImageToImage  = "text_and_image_to_image"
 	FunctionTypeTextAndImagesToVideo = "text_and_images_to_video"
+	FunctionTypeVideosToVideo        = "videos_to_video"
 )
 
 // Workflow providers.
@@ -38,13 +39,14 @@ const (
 
 // WorkflowStep represents a single step in a workflow.
 type WorkflowStep struct {
-	ID           string `json:"id" yaml:"id"`
-	FunctionType string `json:"function_type" yaml:"function_type"`
-	Provider     string `json:"provider,omitempty" yaml:"provider,omitempty"`
-	Prompt       string `json:"prompt,omitempty" yaml:"prompt,omitempty"`
-	Image        string `json:"image,omitempty" yaml:"image,omitempty"`
-	FirstImage   string `json:"first_image,omitempty" yaml:"first_image,omitempty"`
-	LastImage    string `json:"last_image,omitempty" yaml:"last_image,omitempty"`
+	ID           string   `json:"id" yaml:"id"`
+	FunctionType string   `json:"function_type" yaml:"function_type"`
+	Provider     string   `json:"provider,omitempty" yaml:"provider,omitempty"`
+	Prompt       string   `json:"prompt,omitempty" yaml:"prompt,omitempty"`
+	Image        string   `json:"image,omitempty" yaml:"image,omitempty"`
+	FirstImage   string   `json:"first_image,omitempty" yaml:"first_image,omitempty"`
+	LastImage    string   `json:"last_image,omitempty" yaml:"last_image,omitempty"`
+	Videos       []string `json:"videos,omitempty" yaml:"videos,omitempty"`
 }
 
 // Workflow defines an ordered set of steps for content generation.
@@ -88,6 +90,8 @@ func (s *workflowService) Generate(ctx context.Context, wf *Workflow, inputs map
 			res, err = s.processTextAndImageToImage(ctx, step, inputs, results)
 		case FunctionTypeTextAndImagesToVideo:
 			res, err = s.processTextAndImagesToVideo(ctx, step, inputs, results)
+		case FunctionTypeVideosToVideo:
+			res, err = s.processVideosToVideo(ctx, step, inputs, results)
 		default:
 			err = errors.Errorf("unsupported function type: %s", step.FunctionType)
 		}
@@ -151,6 +155,32 @@ func (s *workflowService) processTextAndImagesToVideo(ctx context.Context, step 
 	default:
 		return nil, fmt.Errorf("unsupported provider: %s", provider)
 	}
+}
+
+func (s *workflowService) processVideosToVideo(ctx context.Context, step WorkflowStep, inputs map[string]any, results map[string]any) (any, error) {
+	if len(step.Videos) == 0 {
+		return nil, errors.New("no videos specified in step configuration")
+	}
+
+	var clips [][]byte
+	for _, ref := range step.Videos {
+		name := s.interpolateVariables(ref, inputs, results)
+		var data any
+		var ok bool
+		if data, ok = results[name]; !ok {
+			data, ok = inputs[name]
+		}
+		if !ok {
+			return nil, fmt.Errorf("video reference %s not found", name)
+		}
+		b, ok := data.([]byte)
+		if !ok {
+			return nil, fmt.Errorf("video reference %s is not []byte", name)
+		}
+		clips = append(clips, b)
+	}
+
+	return MergeVideos(clips)
 }
 
 // interpolateVariables replaces placeholders in the template string with values from inputs and results.
