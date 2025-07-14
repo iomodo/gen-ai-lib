@@ -14,8 +14,9 @@ import (
 	"github.com/pkg/errors"
 )
 
-// Seedance1Model identifies the bytedance/seedance-1 model on Replicate.
-const Seedance1Model = "bytedance/seedance-1"
+// Seedance1Model identifies the bytedance/seedance-1-pro model on Replicate.
+// The previous seedance-1 model has been replaced with the pro variant.
+const Seedance1Model = "bytedance/seedance-1-pro"
 
 // Seedance1LiteModel identifies the bytedance/seedance-1-lite model on Replicate.
 const Seedance1LiteModel = "bytedance/seedance-1-lite"
@@ -24,7 +25,7 @@ const Seedance1LiteModel = "bytedance/seedance-1-lite"
 
 type ReplicateService interface {
 	Run(ctx context.Context, model string, prompt string, options map[string]any) (any, error)
-	// RunSeedance1 runs the bytedance/seedance-1 model.
+	// RunSeedance1 runs the bytedance/seedance-1-pro model.
 	// Options may include:
 	//  - "image":               string or *replicate.File
 	//  - "last_frame_image":    string or *replicate.File
@@ -131,7 +132,7 @@ func (r *replicateService) Run(ctx context.Context, model string, prompt string,
 	}
 }
 
-// RunSeedance1 executes the bytedance/seedance-1 model on Replicate.
+// RunSeedance1 executes the bytedance/seedance-1-pro model on Replicate.
 // See the model's documentation for the supported input options.
 func (r *replicateService) RunSeedance1(ctx context.Context, prompt string, options map[string]any) (any, error) {
 	return r.Run(ctx, Seedance1Model, prompt, options)
