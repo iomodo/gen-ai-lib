@@ -149,25 +149,7 @@ func (s *workflowService) processTextAndImagesToVideo(ctx context.Context, step 
 	firstURL := s.interpolateVariables(step.FirstImage, inputs, results)
 	lastURL := s.interpolateVariables(step.LastImage, inputs, results)
 
-	provider := step.Provider
-	if provider == "" {
-		provider = ProviderVeo3Preview
-	}
-
-	switch provider {
-	case ProviderVeo3Preview:
-		svc := gemini.NewGeminiService()
-		return svc.GenerateVeo3PreviewVideoFromURLs(ctx, prompt, firstURL, lastURL)
-	case ProviderSeedance1:
-		svc, err := replicate.NewReplicateService(os.Getenv(ReplicateAPIToken))
-		if err != nil {
-			return nil, err
-		}
-		opts := map[string]any{"image": firstURL, "last_frame_image": lastURL}
-		return svc.RunSeedance1(ctx, prompt, opts)
-	default:
-		return nil, fmt.Errorf("unsupported provider: %s", provider)
-	}
+	return s.generateVideo(ctx, step.Provider, prompt, firstURL, lastURL)
 }
 
 func (s *workflowService) processTextAndImageToVideo(ctx context.Context, step WorkflowStep, inputs map[string]any, results map[string]any) (any, error) {
@@ -181,7 +163,12 @@ func (s *workflowService) processTextAndImageToVideo(ctx context.Context, step W
 	prompt := s.interpolateVariables(step.Prompt, inputs, results)
 	firstURL := s.interpolateVariables(step.FirstImage, inputs, results)
 
-	provider := step.Provider
+	return s.generateVideo(ctx, step.Provider, prompt, firstURL, "")
+}
+
+// generateVideo dispatches the video generation request to the chosen provider.
+// If lastURL is empty, only the first frame is sent.
+func (s *workflowService) generateVideo(ctx context.Context, provider, prompt, firstURL, lastURL string) (any, error) {
 	if provider == "" {
 		provider = ProviderVeo3Preview
 	}
@@ -189,6 +176,9 @@ func (s *workflowService) processTextAndImageToVideo(ctx context.Context, step W
 	switch provider {
 	case ProviderVeo3Preview:
 		svc := gemini.NewGeminiService()
+		if lastURL != "" {
+			return svc.GenerateVeo3PreviewVideoFromURLs(ctx, prompt, firstURL, lastURL)
+		}
 		return svc.GenerateVeo3PreviewVideoWithStartFrameURL(ctx, prompt, firstURL)
 	case ProviderSeedance1:
 		svc, err := replicate.NewReplicateService(os.Getenv(ReplicateAPIToken))
@@ -196,6 +186,9 @@ func (s *workflowService) processTextAndImageToVideo(ctx context.Context, step W
 			return nil, err
 		}
 		opts := map[string]any{"image": firstURL}
+		if lastURL != "" {
+			opts["last_frame_image"] = lastURL
+		}
 		return svc.RunSeedance1(ctx, prompt, opts)
 	default:
 		return nil, fmt.Errorf("unsupported provider: %s", provider)

@@ -35,6 +35,21 @@ type geminiService struct {
 	client *genai.Client
 }
 
+func waitAndDownloadVideo(ctx context.Context, client *genai.Client, op *genai.GenerateVideosOperation) ([]byte, error) {
+	for !op.Done {
+		time.Sleep(2 * time.Second)
+		var err error
+		op, err = client.Operations.GetVideosOperation(ctx, op, nil)
+		if err != nil {
+			return nil, err
+		}
+	}
+	if len(op.Response.GeneratedVideos) > 0 {
+		return client.Files.Download(ctx, genai.NewDownloadURIFromGeneratedVideo(op.Response.GeneratedVideos[0]), nil)
+	}
+	return nil, fmt.Errorf("video generation did not return a result")
+}
+
 func NewGeminiService() GeminiService {
 	apiKey := os.Getenv("GEMINI_API_KEY")
 
@@ -99,21 +114,7 @@ func (s *geminiService) GenerateVeo3Video(ctx context.Context, prompt string) ([
 	if err != nil {
 		return nil, err
 	}
-	for !op.Done {
-		time.Sleep(2 * time.Second)
-		op, err = s.client.Operations.GetVideosOperation(ctx, op, nil)
-		if err != nil {
-			return nil, err
-		}
-	}
-	if len(op.Response.GeneratedVideos) > 0 {
-		data, err := s.client.Files.Download(ctx, genai.NewDownloadURIFromGeneratedVideo(op.Response.GeneratedVideos[0]), nil)
-		if err != nil {
-			return nil, err
-		}
-		return data, nil
-	}
-	return nil, fmt.Errorf("video generation did not return a result")
+	return waitAndDownloadVideo(ctx, s.client, op)
 }
 
 // GenerateVeo3PreviewVideo creates a video using the veo-3.0-generate-preview model
@@ -127,21 +128,7 @@ func (s *geminiService) GenerateVeo3PreviewVideo(ctx context.Context, prompt str
 	if err != nil {
 		return nil, err
 	}
-	for !op.Done {
-		time.Sleep(2 * time.Second)
-		op, err = s.client.Operations.GetVideosOperation(ctx, op, nil)
-		if err != nil {
-			return nil, err
-		}
-	}
-	if len(op.Response.GeneratedVideos) > 0 {
-		data, err := s.client.Files.Download(ctx, genai.NewDownloadURIFromGeneratedVideo(op.Response.GeneratedVideos[0]), nil)
-		if err != nil {
-			return nil, err
-		}
-		return data, nil
-	}
-	return nil, fmt.Errorf("video generation did not return a result")
+	return waitAndDownloadVideo(ctx, s.client, op)
 }
 
 // GenerateVeo3PreviewVideoFromURLs downloads the first and last frame images
@@ -179,21 +166,7 @@ func (s *geminiService) GenerateVeo3PreviewVideoWithStartFrame(ctx context.Conte
 	if err != nil {
 		return nil, err
 	}
-	for !op.Done {
-		time.Sleep(2 * time.Second)
-		op, err = s.client.Operations.GetVideosOperation(ctx, op, nil)
-		if err != nil {
-			return nil, err
-		}
-	}
-	if len(op.Response.GeneratedVideos) > 0 {
-		data, err := s.client.Files.Download(ctx, genai.NewDownloadURIFromGeneratedVideo(op.Response.GeneratedVideos[0]), nil)
-		if err != nil {
-			return nil, err
-		}
-		return data, nil
-	}
-	return nil, fmt.Errorf("video generation did not return a result")
+	return waitAndDownloadVideo(ctx, s.client, op)
 }
 
 // GenerateVeo3PreviewVideoWithStartFrameURL downloads the first frame image from
