@@ -91,3 +91,51 @@ func MergeVideos(videos [][]byte) ([]byte, error) {
 
 	return merged, nil
 }
+
+// AddAudioToVideo adds the given audio track to a video clip. If the audio is
+// shorter than the video, it will be looped until the video ends. If the audio
+// is longer, it will be truncated to match the video's duration. The resulting
+// video with audio is returned as a byte slice. ffmpeg must be installed and
+// accessible on the system PATH.
+func AddAudioToVideo(video, audio []byte) ([]byte, error) {
+	tmpDir, err := os.MkdirTemp("", "addaudio")
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to create temp dir")
+	}
+	defer os.RemoveAll(tmpDir)
+
+	vidFile := filepath.Join(tmpDir, "input.mp4")
+	audFile := filepath.Join(tmpDir, "input.mp3")
+	outFile := filepath.Join(tmpDir, "output.mp4")
+
+	if err := os.WriteFile(vidFile, video, 0o600); err != nil {
+		return nil, errors.Wrap(err, "failed to write video")
+	}
+	if err := os.WriteFile(audFile, audio, 0o600); err != nil {
+		return nil, errors.Wrap(err, "failed to write audio")
+	}
+
+	cmd := exec.Command(
+		"ffmpeg",
+		"-stream_loop", "-1", "-i", audFile,
+		"-i", vidFile,
+		"-shortest",
+		"-map", "1:v:0",
+		"-map", "0:a:0",
+		"-c:v", "copy",
+		"-y", outFile,
+	)
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
+
+	if err := cmd.Run(); err != nil {
+		return nil, fmt.Errorf("ffmpeg run error: %w, %s", err, stderr.String())
+	}
+
+	merged, err := os.ReadFile(outFile)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to read output video")
+	}
+
+	return merged, nil
+}

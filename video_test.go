@@ -22,6 +22,21 @@ func createColorVideo(color string) ([]byte, error) {
 	return data, err
 }
 
+func createToneAudio() ([]byte, error) {
+	tmpFile, err := os.CreateTemp("", "tone-*.mp3")
+	if err != nil {
+		return nil, err
+	}
+	tmpFile.Close()
+	cmd := exec.Command("ffmpeg", "-f", "lavfi", "-i", "sine=frequency=1000:duration=1", "-y", tmpFile.Name())
+	if output, err := cmd.CombinedOutput(); err != nil {
+		return nil, fmt.Errorf("ffmpeg create audio: %v, %s", err, string(output))
+	}
+	data, err := os.ReadFile(tmpFile.Name())
+	os.Remove(tmpFile.Name())
+	return data, err
+}
+
 func TestAppendVideos(t *testing.T) {
 	if _, err := exec.LookPath("ffmpeg"); err != nil {
 		t.Skip("ffmpeg not installed")
@@ -67,5 +82,28 @@ func TestMergeVideos(t *testing.T) {
 	}
 	if len(merged) == 0 {
 		t.Fatalf("merged video is empty")
+	}
+}
+
+func TestAddAudioToVideo(t *testing.T) {
+	if _, err := exec.LookPath("ffmpeg"); err != nil {
+		t.Skip("ffmpeg not installed")
+	}
+
+	vid, err := createColorVideo("yellow")
+	if err != nil {
+		t.Fatalf("failed to create video: %v", err)
+	}
+	aud, err := createToneAudio()
+	if err != nil {
+		t.Fatalf("failed to create audio: %v", err)
+	}
+
+	merged, err := AddAudioToVideo(vid, aud)
+	if err != nil {
+		t.Fatalf("AddAudioToVideo returned error: %v", err)
+	}
+	if len(merged) == 0 {
+		t.Fatalf("output video is empty")
 	}
 }

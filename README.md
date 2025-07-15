@@ -22,6 +22,7 @@ Coming soon: Installation and usage instructions.
 
 The `AppendVideos` function merges two MP4 clips using the `ffmpeg` command-line tool. You must have `ffmpeg` installed and accessible on your system `PATH`.
 The `MergeVideos` function concatenates multiple MP4 clips into one video using `ffmpeg` as well. When used in workflows, the `videos_to_video` step type can combine video results from earlier steps. Reference the step IDs in the `videos` list so later steps can merge their outputs.
+The `AddAudioToVideo` helper attaches an audio track to a video. The new workflow step type `video_and_audio_to_video` can be used to overlay audio on a generated clip.
 
 ## License
 
