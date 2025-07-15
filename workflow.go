@@ -7,6 +7,9 @@ import (
 	"strings"
 	"time"
 
+	"io"
+	"net/http"
+
 	"github.com/iomodo/gen-ai-lib/external/gemini"
 	"github.com/iomodo/gen-ai-lib/external/replicate"
 	"github.com/pkg/errors"
@@ -38,6 +41,7 @@ const (
 	ProviderFluxSchnell                     = "flux-schnell"
 	ProviderSana                            = "sana"
 	ProviderSeedance1                       = replicate.Seedance1Model
+	ProviderSeedance1Lite                   = replicate.Seedance1LiteModel
 	ProviderVeo3Preview                     = gemini.VEO_3_PREVIEW_MODEL
 )
 
@@ -190,6 +194,16 @@ func (s *workflowService) generateVideo(ctx context.Context, provider, prompt, f
 			opts["last_frame_image"] = lastURL
 		}
 		return svc.RunSeedance1(ctx, prompt, opts)
+	case ProviderSeedance1Lite:
+		svc, err := replicate.NewReplicateService(os.Getenv(ReplicateAPIToken))
+		if err != nil {
+			return nil, err
+		}
+		opts := map[string]any{"image": firstURL}
+		if lastURL != "" {
+			opts["last_frame_image"] = lastURL
+		}
+		return svc.RunSeedance1Lite(ctx, prompt, opts)
 	default:
 		return nil, fmt.Errorf("unsupported provider: %s", provider)
 	}
@@ -201,19 +215,18 @@ func (s *workflowService) processVideosToVideo(ctx context.Context, step Workflo
 	}
 
 	var clips [][]byte
-	for _, ref := range step.Videos {
-		name := s.interpolateVariables(ref, inputs, results)
-		var data any
-		var ok bool
-		if data, ok = results[name]; !ok {
-			data, ok = inputs[name]
-		}
+	for _, name := range step.Videos {
+		data, ok := results[name]
 		if !ok {
 			return nil, fmt.Errorf("video reference %s not found", name)
 		}
-		b, ok := data.([]byte)
+		url, ok := data.(string)
 		if !ok {
 			return nil, fmt.Errorf("video reference %s is not []byte", name)
+		}
+		b, err := DownloadFileToBytes(url)
+		if err != nil {
+			return nil, fmt.Errorf("failed to download video from %s: %w", url, err)
 		}
 		clips = append(clips, b)
 	}
@@ -233,4 +246,15 @@ func (s *workflowService) interpolateVariables(template string, inputs map[strin
 		result = strings.ReplaceAll(result, placeholder, fmt.Sprint(v))
 	}
 	return result
+}
+
+// DownloadFileToBytes downloads the file from the given URL and returns its contents as a byte slice.
+func DownloadFileToBytes(url string) ([]byte, error) {
+	resp, err := http.Get(url)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	return io.ReadAll(resp.Body)
 }

@@ -234,14 +234,14 @@ func TestWorkflowSeedanceSingleImageClipsAndMerge(t *testing.T) {
 			{
 				ID:           "clip1",
 				FunctionType: FunctionTypeTextAndImageToVideo,
-				Provider:     ProviderSeedance1,
+				Provider:     ProviderSeedance1Lite,
 				Prompt:       "A seedance clip from one image",
 				FirstImage:   "https://picsum.photos/seed/sclip1/256",
 			},
 			{
 				ID:           "clip2",
 				FunctionType: FunctionTypeTextAndImageToVideo,
-				Provider:     ProviderSeedance1,
+				Provider:     ProviderSeedance1Lite,
 				Prompt:       "Another seedance clip",
 				FirstImage:   "https://picsum.photos/seed/sclip2/256",
 			},
