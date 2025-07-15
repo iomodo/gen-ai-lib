@@ -23,6 +23,7 @@ const (
 	FunctionTypeTextAndImagesToVideo = "text_and_images_to_video"
 	FunctionTypeTextAndImageToVideo  = "text_and_image_to_video"
 	FunctionTypeVideosToVideo        = "videos_to_video"
+	FunctionTypeVideoAndAudioToVideo = "video_and_audio_to_video"
 )
 
 // Workflow providers.
@@ -55,6 +56,8 @@ type WorkflowStep struct {
 	FirstImage   string   `json:"first_image,omitempty" yaml:"first_image,omitempty"`
 	LastImage    string   `json:"last_image,omitempty" yaml:"last_image,omitempty"`
 	Videos       []string `json:"videos,omitempty" yaml:"videos,omitempty"`
+	Video        string   `json:"video,omitempty" yaml:"video,omitempty"`
+	Audio        string   `json:"audio,omitempty" yaml:"audio,omitempty"`
 }
 
 // Workflow defines an ordered set of steps for content generation.
@@ -102,6 +105,8 @@ func (s *workflowService) Generate(ctx context.Context, wf *Workflow, inputs map
 			res, err = s.processTextAndImageToVideo(ctx, step, inputs, results)
 		case FunctionTypeVideosToVideo:
 			res, err = s.processVideosToVideo(ctx, step, inputs, results)
+		case FunctionTypeVideoAndAudioToVideo:
+			res, err = s.processVideoAndAudioToVideo(ctx, step, inputs, results)
 		default:
 			err = errors.Errorf("unsupported function type: %s", step.FunctionType)
 		}
@@ -232,6 +237,46 @@ func (s *workflowService) processVideosToVideo(ctx context.Context, step Workflo
 	}
 
 	return MergeVideos(clips)
+}
+
+func (s *workflowService) processVideoAndAudioToVideo(ctx context.Context, step WorkflowStep, inputs map[string]any, results map[string]any) (any, error) {
+	if step.Video == "" || step.Audio == "" {
+		return nil, errors.New("video or audio reference missing in step configuration")
+	}
+
+	getBytes := func(name string) ([]byte, error) {
+		if data, ok := results[name]; ok {
+			switch v := data.(type) {
+			case []byte:
+				return v, nil
+			case string:
+				return DownloadFileToBytes(v)
+			}
+			return nil, fmt.Errorf("reference %s is not []byte or string", name)
+		}
+		if data, ok := inputs[name]; ok {
+			switch v := data.(type) {
+			case []byte:
+				return v, nil
+			case string:
+				return DownloadFileToBytes(v)
+			}
+			return nil, fmt.Errorf("reference %s is not []byte or string", name)
+		}
+		return nil, fmt.Errorf("reference %s not found", name)
+	}
+
+	vidBytes, err := getBytes(step.Video)
+	if err != nil {
+		return nil, err
+	}
+
+	audBytes, err := getBytes(step.Audio)
+	if err != nil {
+		return nil, err
+	}
+
+	return AddAudioToVideo(vidBytes, audBytes)
 }
 
 // interpolateVariables replaces placeholders in the template string with values from inputs and results.

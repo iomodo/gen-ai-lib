@@ -265,3 +265,35 @@ func TestWorkflowSeedanceSingleImageClipsAndMerge(t *testing.T) {
 		t.Fatalf("merged video is empty")
 	}
 }
+
+func TestWorkflowVideoAndAudioToVideo(t *testing.T) {
+	if _, err := exec.LookPath("ffmpeg"); err != nil {
+		t.Skip("ffmpeg not installed")
+	}
+
+	vid, err := createColorVideo("red")
+	if err != nil {
+		t.Fatalf("failed to create video: %v", err)
+	}
+	aud, err := createToneAudio()
+	if err != nil {
+		t.Fatalf("failed to create audio: %v", err)
+	}
+
+	svc := NewWorkflowService()
+	wf := &Workflow{Steps: []WorkflowStep{{ID: "add", FunctionType: FunctionTypeVideoAndAudioToVideo, Video: "vid", Audio: "aud"}}}
+
+	inputs := map[string]any{"vid": vid, "aud": aud}
+
+	result, _, err := svc.Generate(context.Background(), wf, inputs)
+	if err != nil {
+		t.Fatalf("Generate returned error: %v", err)
+	}
+	b, ok := result.([]byte)
+	if !ok {
+		t.Fatalf("expected []byte result, got %T", result)
+	}
+	if len(b) == 0 {
+		t.Fatalf("output video is empty")
+	}
+}
