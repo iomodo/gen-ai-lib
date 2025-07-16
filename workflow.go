@@ -104,7 +104,7 @@ func (s *workflowService) Generate(ctx context.Context, wf *Workflow, inputs map
 		case FunctionTypeTextAndImageToVideo:
 			res, err = s.processTextAndImageToVideo(ctx, step, inputs, results)
 		case FunctionTypeVideosToVideo:
-			res, err = s.processVideosToVideo(ctx, step, inputs, results)
+			res, err = s.processVideosToVideo(step, results)
 		case FunctionTypeVideoAndAudioToVideo:
 			res, err = s.processVideoAndAudioToVideo(ctx, step, inputs, results)
 		default:
@@ -155,10 +155,7 @@ func (s *workflowService) processTextAndImagesToVideo(ctx context.Context, step 
 	}
 
 	prompt := s.interpolateVariables(step.Prompt, inputs, results)
-	firstURL := s.interpolateVariables(step.FirstImage, inputs, results)
-	lastURL := s.interpolateVariables(step.LastImage, inputs, results)
-
-	return s.generateVideo(ctx, step.Provider, prompt, firstURL, lastURL)
+	return s.generateVideo(ctx, step.Provider, prompt, step.FirstImage, step.LastImage)
 }
 
 func (s *workflowService) processTextAndImageToVideo(ctx context.Context, step WorkflowStep, inputs map[string]any, results map[string]any) (any, error) {
@@ -170,9 +167,7 @@ func (s *workflowService) processTextAndImageToVideo(ctx context.Context, step W
 	}
 
 	prompt := s.interpolateVariables(step.Prompt, inputs, results)
-	firstURL := s.interpolateVariables(step.FirstImage, inputs, results)
-
-	return s.generateVideo(ctx, step.Provider, prompt, firstURL, "")
+	return s.generateVideo(ctx, step.Provider, prompt, step.FirstImage, "")
 }
 
 // generateVideo dispatches the video generation request to the chosen provider.
@@ -214,7 +209,7 @@ func (s *workflowService) generateVideo(ctx context.Context, provider, prompt, f
 	}
 }
 
-func (s *workflowService) processVideosToVideo(ctx context.Context, step WorkflowStep, inputs map[string]any, results map[string]any) (any, error) {
+func (s *workflowService) processVideosToVideo(step WorkflowStep, results map[string]any) (any, error) {
 	if len(step.Videos) == 0 {
 		return nil, errors.New("no videos specified in step configuration")
 	}
